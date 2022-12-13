@@ -1,0 +1,549 @@
+﻿@model ShortestDistance.VewModels.CompareInfoViewModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<head>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />k,
+    <link href="~/Content/bootstrap.min.css" rel="stylesheet" />
+    <script src="~/Scripts/jquery-3.0.0.js"></script>
+    <script src="~/Scripts/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.bundle.min.js"></script>
+    <title>Index</title>
+    <style>
+         /* Always set the map height explicitly to define the size of the div
+        * element that contains the map. */
+         #map {
+             height: 100%;
+         }
+         /* Optional: Makes the sample page fill the window. */
+         html, body {
+             height: 100%;
+             margin: 0;
+             padding: 0;
+         }
+    </style>
+</head>
+
+<html>
+<body>
+    
+
+            <div class="col-md-4" style="float:left">
+               
+                @using (Html.BeginForm())
+        {
+                    <div class="form-group">
+                        <label class="control-lable col-md-4">Select Source:</label>
+                        <br />
+                        <div class="col-md-8">
+                            @Html.DropDownListFor(m => m.SourceId, new SelectList(Model.Vertices, "id", "name"), "Select Source", new { @class = "form-control" })
+                            @Html.ValidationMessageFor(m => m.SourceId, "", new { @class = "text-danger" })
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="control-lable col-md-4">Select Destination:</label><br />
+                        <div class="col-md-8">
+                            @Html.DropDownListFor(m => m.DestinationId, new SelectList(Model.Vertices, "id", "name"), "Select Destination", new { @class = "form-control" })
+                            @Html.ValidationMessageFor(m => m.DestinationId, "", new { @class = "text-danger" })
+                        </div>
+                    </div>
+
+
+                    <div class="form-group">
+                        <div class="col-md-10">
+
+                            <button type="button" onclick="floyd();" class="btn btn-outline-danger">Floyd</button>
+                            <button type="button" onclick="dijkstra()" class="btn btn-outline-success">Dijkstra</button>
+                            <button type="button" onclick="bellman()" class="btn btn-outline-info">Bellman-Ford</button>
+                        </div>
+                    </div>
+
+        }
+
+
+                <table class="table table-striped table-hover">
+                    <tr>
+                        <th>Floyd Algorithm</th>
+                        <th>Dijkstra Algorithm</th>
+                        <th>Bellman Algorithm</th>
+                    </tr>
+                    <tr>
+                        <td id="floyd"></td>
+                        <td id="dijkstra"></td>
+                        <td id="bellman"></td>
+                    </tr>
+                    <tr>
+                        <td id="floydnodes"></td>
+                        <td id="dijkstranodes"></td>
+                        <td id="bellmannodes"></td>
+                    </tr>
+                    <tr>
+                        <td id="floyDistance"></td>
+                        <td id="dijkstraDistance"></td>
+                        <td id="bellmanDistance"></td>
+                    </tr>
+
+                </table>
+
+                <div class="box box-primary">
+                    <div class="box-header with-border">
+
+                        @*<div class="box-tools pull-right">
+                    <button type="button" class="btn btn-box-tool" data-widget="collapse">
+                        <i class="fa fa-minus"></i>
+                    </button>
+                    <button type="button" class="btn btn-box-tool" data-widget="remove"><i class="fa fa-times"></i></button>
+                </div>*@
+                    </div>
+                    <div class="box-body">
+                        <div class="chart">
+                            <canvas id="myChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8" id="map">
+
+            </div>
+
+         
+    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?sensor=false"></script>
+    <script>
+      var customLabel = {
+        restaurant: {
+          label: 'R'
+        },
+        B: {
+          label: 'B'
+        }
+      };
+    
+     
+      var map;
+      var marker;
+      
+      var floydTime=0 ;
+      var dijkstraTime=0;
+      var bellmanTime=0;
+      var chartData = {
+          type: 'bar', // bar, horizontalBar, pie, line, doughnut, radar, polarArea
+          data: {
+              labels: ['Floyd', 'Dijkstra', 'Bellman'],
+              datasets: [{
+                  label: 'Time Complexity',
+                  data: [floydTime, dijkstraTime, bellmanTime],
+                 
+                  backgroundColor: [
+                       'rgba(255,0, 0, 0.6)',
+                       'rgba(0, 255, 0, 0.6)',
+                       'rgba(0, 0, 255, 0.6)'],
+                  borderWidth: 1,
+                  borderColor: '#777',
+                  hoverBorderWidth: 3,
+                  hoverBorderColor: '#000'
+              }]
+          },
+          options: {
+              title: {
+                  display: true,
+                  text: 'Time Complexities',
+                  fontSize: 25,
+                  responsive: true
+              },
+              legend: {
+                  display: false,
+                  position: 'right',
+                  labels: {
+                      fontColor: '#000'
+                  }
+              },
+              layout: {
+                  padding: {
+                      left: 5,
+                      right: 5,
+                      bottom: 0,
+                      top: 0
+                  }
+              },
+              tooltips: {
+                  enabled: true
+              }
+          }
+      }
+      // Global Options
+      Chart.defaults.global.defaultFontFamily = 'Lato';
+      Chart.defaults.global.defaultFontSize = 18;
+      Chart.defaults.global.defaultFontColor = '#777';
+      var myChart = document.getElementById('myChart').getContext('2d');
+      new Chart(myChart, chartData);
+
+      //var infoWindow;
+
+      function initMap() {
+        map = new google.maps.Map(document.getElementById('map'), {
+            center: //new google.maps.LatLng(-33.863276, 151.207977),
+                new google.maps.LatLng(16.774642, 96.148892),
+          zoom: 16
+        });
+        var infoWindow = new google.maps.InfoWindow;
+
+         
+        $.ajax({
+            url: "/shortestdistance/GetNodeInfo",//request
+            data: {}, //corresponding parameter
+            type: "get",//mentod is post or get
+            contextType: "application/json", //return type   in this app return the json type
+            success: function (markers) {
+                var i = 0;
+                Array.prototype.forEach.call(markers, function (markerElem) {
+
+                    var id = markerElem.id;
+                    var name = markerElem.name;
+                    var address = markerElem.address;
+                    var type = "B";
+                    var point = new google.maps.LatLng(
+                       parseFloat(markerElem.lat),
+                       parseFloat(markerElem.lng));
+                  
+                    var infowincontent = document.createElement('div');
+                    var strong = document.createElement('strong');
+                    strong.textContent = name
+                    infowincontent.appendChild(strong);
+                    infowincontent.appendChild(document.createElement('br'));
+
+                    var text = document.createElement('text');
+                    text.textContent = address
+                    infowincontent.appendChild(text);
+                    infoWindow.setContent(infowincontent);
+                   
+                    var icon = customLabel[type];
+                    marker = new google.maps.Marker({
+                        map: map,
+                        position: point,
+                        label: icon.label
+                    });
+                 
+
+                    google.maps.event.addListener(marker, 'click', function (marker,i) {
+                        return function () {
+                           
+                                infoWindow.setContent(infowincontent);
+                                infoWindow.open(map, marker);
+                        }
+                    }(marker,i));
+                    i++;
+                   
+                });
+                
+            }                               //if call is success do this function
+        });
+
+    
+        
+      }
+      google.maps.event.addDomListener(window, 'load', initMap);
+
+      function downloadUrl(url, callback) {
+        var request = window.ActiveXObject ?
+            new ActiveXObject('Microsoft.XMLHTTP') :
+            new XMLHttpRequest;
+
+        request.onreadystatechange = function() {
+          if (request.readyState == 4) {
+            request.onreadystatechange = doNothing;
+            callback(request, request.status);
+          }
+        };
+
+        request.open('GET', url, true);
+        request.send(null);
+      }
+      function floyd() {
+
+          var sourceId = document.getElementById("SourceId");
+
+          var destinationId = document.getElementById("DestinationId");
+
+
+          $.ajax({
+              url: "/shortestdistance/GetPath?SourceId=" + sourceId.value + "&DestinationId=" + destinationId.value,//request
+              data: {}, //corresponding parameter
+              type: "get",//mentod is post or get
+              contextType: "application/json", //return type   in this app return the json type
+              success: function (model) {
+                  console.log(model);
+                  var pathCoordinates = [];
+                  var vertices = model.Path;
+
+
+                  vertices.forEach(myFunction);
+                  function myFunction(item, index) {
+                      pathCoordinates.push({ lat: item.lat, lng: item.lng })
+                  }
+
+                  console.log(pathCoordinates);
+                  const shortPath = new google.maps.Polyline({
+                      path: pathCoordinates,
+                      geodesic: true,
+                      strokeColor: "#FF0000",
+                      strokeOpacity: 1.0,
+                      strokeWeight: 4
+                  });
+
+                  shortPath.setMap(map);
+                  floydTime = model.TimeComplexcity;
+
+                  $("#floyd").empty();
+                  $("#floyd").append(floydTime / 1000000 + "Seconds");
+                  var numberOfNodes = Object.keys(vertices).length;
+                  $("#floydnodes").append(numberOfNodes +" "+ "nodes");
+                  var distance = model.TotalDistance;
+                  $("#floyDistance").append(distance + " " + "km");
+                  var myChart = document.getElementById('myChart').getContext('2d');
+
+                 
+                  var floydChartData = {
+                      type: 'bar', // bar, horizontalBar, pie, line, doughnut, radar, polarArea
+                      data: {
+                          labels: ['Floyd', 'Dijkstra', 'Bellman'],
+                          datasets: [{
+                              label: "Floyd Time Complexity",
+                              data: [floydTime, dijkstraTime, bellmanTime],
+                             // backgroundColor:'red',
+                              backgroundColor: [
+                                  'rgba(255,0, 0, 0.6)',
+                                  'rgba(0, 255, 0, 0.6)',
+                                  'rgba(0, 0, 255, 0.6)'],
+                              borderWidth: 1,
+                              borderColor: '#777',
+                              hoverBorderWidth: 3,
+                              hoverBorderColor: '#000'
+                          }]
+                      },
+                      options: {
+                          title: {
+                              display: true,
+                              text: 'Time Complexities',
+                              fontSize: 25,
+                              responsive: true
+                          },
+                          legend: {
+                              display: false,
+                              position: 'right',
+                              labels: {
+                                  fontColor: '#000'
+                              }
+                          },
+                          layout: {
+                              padding: {
+                                  left: 5,
+                                  right: 5,
+                                  bottom: 0,
+                                  top: 0
+                              }
+                          },
+                          tooltips: {
+                             enabled: true
+                          }
+                      }
+                  }
+                  new Chart(myChart, floydChartData);
+                
+              }
+
+          });
+      }
+      function dijkstra() {
+          var sourceId = document.getElementById("SourceId");
+
+          var destinationId = document.getElementById("DestinationId");
+          $.ajax({
+              url: "/shortestdistance/GetPathDijkstra?SourceId=" + sourceId.value + "&DestinationId=" + destinationId.value,//request
+              data: {}, //corresponding parameter
+              type: "get",//mentod is post or get
+              contextType: "application/json", //return type   in this app return the json type
+              success: function (model) {
+                  console.log(model);
+
+                  var pathCoordinates = [];
+                  var vertices = model.Path;
+                  vertices.forEach(myFunction);
+                  function myFunction(item, index) {
+                      pathCoordinates.push({ lat: item.lat, lng: item.lng })
+                  }
+                  const shortPath = new google.maps.Polyline({
+                      path: pathCoordinates,
+                      geodesic: true,
+                      strokeColor: "#00FF00",
+                      strokeOpacity: 1.0,
+                      strokeWeight: 4
+                  });
+                  shortPath.setMap(map);
+
+                  dijkstraTime = model.TimeComplexcity;
+                  $("#dijkstra").empty();
+                  $("#dijkstra").append(dijkstraTime / 1000000 + "Seconds");
+                  var numberOfNodes = Object.keys(vertices).length;
+                  $("#dijkstranodes").append(numberOfNodes + " " + "nodes");
+                  var distance = model.TotalDistance;
+                  $("#dijkstraDistance").append(distance + " " + "km");
+                  var myChart = document.getElementById('myChart').getContext('2d');
+                  var dijkstraChartData = {
+                      type: 'bar', // bar, horizontalBar, pie, line, doughnut, radar, polarArea
+                      data: {
+                          labels: ['Floyd', 'Dijkstra', 'Bellman'],
+                          datasets: [{
+                              label: 'Dijkstra Time Complexity',
+                              data: [floydTime, dijkstraTime, bellmanTime],
+                              backgroundColor:'green',
+                              backgroundColor: [
+                                 'rgba(255,0, 0, 0.6)',
+                                 'rgba(0, 255, 0, 0.6)',
+                                 'rgba(0, 0, 255, 0.6)'],
+                              borderWidth: 1,
+                              borderColor: '#777',
+                              hoverBorderWidth: 3,
+                              hoverBorderColor: '#000'
+                          }]
+                      },
+                      options: {
+                          title: {
+                              display: true,
+                              text: 'Time Complexities',
+                              fontSize: 25,
+                              responsive: true
+                          },
+                          legend: {
+                              display: false,
+                              position: 'right',
+                              labels: {
+                                  fontColor: '#000'
+                              }
+                          },
+                          layout: {
+                              padding: {
+                                  left:5,
+                                  right: 5,
+                                  bottom: 0,
+                                  top: 0
+                              }
+                          },
+                          tooltips: {
+                              enabled: true
+                          }
+                      }
+                  }
+                  new Chart(myChart, dijkstraChartData);
+
+              }
+
+
+          });
+      }
+      function bellman() {
+
+          var sourceId = document.getElementById("SourceId");
+
+          var destinationId = document.getElementById("DestinationId");
+          $.ajax({
+              url: "/shortestdistance/GetPathBellman?SourceId=" + sourceId.value + "&DestinationId=" + destinationId.value,//request
+              data: {}, //corresponding parameter
+              type: "get",//mentod is post or get
+              contextType: "application/json", //return type   in this app return the json type
+              success: function (model) {
+
+                  console.log(model);
+
+                  var pathCoordinates = [];
+                  var vertices = model.Path;
+                  vertices.forEach(myFunction);
+                  function myFunction(item, index) {
+                      pathCoordinates.push({ lat: item.lat, lng: item.lng })
+                  }
+
+                  console.log(pathCoordinates);
+                  const shortPath = new google.maps.Polyline({
+                      path: pathCoordinates,
+                      geodesic: true,
+                      strokeColor: "#0000FF",
+                      strokeOpacity: 1.0,
+                      strokeWeight: 4
+                  });
+
+                  shortPath.setMap(map);
+                  bellmanTime = model.TimeComplexcity;
+                  $("#bellman").empty();
+                  $("#bellman").append(bellmanTime / 1000000 + "Seconds");
+                  var numberOfNodes = Object.keys(vertices).length;
+                  $("#bellmannodes").append(numberOfNodes + " " + "nodes");
+                  var distance = model.TotalDistance;
+                  $("#bellmanDistance").append(distance + " " + "km");
+                  var myChart = document.getElementById('myChart').getContext('2d');
+                  var bellmanChartData = {
+                      type: 'bar', // bar, horizontalBar, pie, line, doughnut, radar, polarArea
+                      data: {
+                          labels: ['Floyd', 'Dijkstra', 'Bellman'],
+                          datasets: [{
+                              label: 'Bellman Time Complexity',
+                              data: [floydTime, dijkstraTime, bellmanTime],
+                              backgroundColor:'blue',
+                              backgroundColor: [
+                                  'rgba(255,0, 0, 0.6)',
+                                 'rgba(0, 255, 0, 0.6)',
+                                  'rgba(0, 0, 255, 0.6)'],
+                              borderWidth: 1,
+                              borderColor: '#777',
+                              hoverBorderWidth: 3,
+                              hoverBorderColor: '#000'
+                          }]
+                      },
+                      options: {
+                          title: {
+                              display: true,
+                              text: 'Time Complexities',
+                              fontSize: 25,
+                              responsive: true
+                          },
+                          legend: {
+                              display: false,
+                              position: 'right',
+                              labels: {
+                                  fontColor: '#000'
+                              }
+                          },
+                          layout: {
+                              padding: {
+                                  left: 5,
+                                  right: 5,
+                                  bottom: 0,
+                                  top: 0
+                              }
+                          },
+                          tooltips: {
+                              enabled: true
+                          }
+                      }
+                  }
+                  new Chart(myChart, bellmanChartData);
+              }
+
+
+          });
+      }
+
+      function doNothing() { }
+
+     
+    </script>
+
+    @*<script async defer
+            src="https://maps.googleapis.com/maps/api/js?key=&callback=initMap">
+    </script>*@
+   
+  
+</body>
+</html>
